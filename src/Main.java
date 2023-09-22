@@ -1,53 +1,83 @@
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 
-public class Main{
+public class Main {
+    private static final String sourceFilePath = "src/1.txt";
+    private static final String destinationFilePath = "src/1_copy.txt";
+
+    static class SequentialCopy implements Runnable {
+        @Override
+        public void run() {
+            try {
+                FileReader fileReader = new FileReader(sourceFilePath);
+                FileWriter fileWriter = new FileWriter(destinationFilePath);
+
+                int character;
+                while ((character = fileReader.read()) != -1) {
+                    fileWriter.write(character);
+                }
+
+                fileReader.close();
+                fileWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    static class ParallelCopy implements Runnable {
+        private int start;
+        private int end;
+
+        public ParallelCopy(int start, int end) {
+            this.start = start;
+            this.end = end;
+        }
+
+        @Override
+        public void run() {
+            try {
+                FileReader fileReader = new FileReader(sourceFilePath);
+                FileWriter fileWriter = new FileWriter(destinationFilePath);
+
+                fileReader.skip(start);
+                for (int i = start; i < end; i++) {
+                    int character = fileReader.read();
+                    if (character == -1) break;
+                    fileWriter.write(character);
+                }
+
+                fileReader.close();
+                fileWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     public static void main(String[] args) {
-        String sourceFile1 = "src/1.txt";
-        String destinationFile1 = "src/1_copy.txt";
         long startTime = System.currentTimeMillis();
-        sequentialCopy(sourceFile1, destinationFile1);
+        SequentialCopy sequentialCopy = new SequentialCopy();
+        sequentialCopy.run();
         long endTime = System.currentTimeMillis();
-        long sequentialTime = endTime - startTime;
+        System.out.println("Время, затрачиваемое на последовательное копирование: " + (endTime - startTime) + " ms");
+
         startTime = System.currentTimeMillis();
-        parallelCopy(sourceFile1, destinationFile1);
-        endTime = System.currentTimeMillis();
-        long parallelTime = endTime - startTime;
-        System.out.println("Последовательное копирование: " + sequentialTime + " ms");
-        System.out.println("Параллельное копирование: " + parallelTime + " ms");
-    }
-    public static void sequentialCopy(String sourcePath, String destinationPath) {
-        try (FileReader reader = new FileReader(sourcePath);
-             FileWriter writer = new FileWriter(destinationPath)) {
-            int character;
-            while ((character = reader.read()) != -1) {
-                writer.write(character);
-            }
-            System.out.println("Успешно завершено!");
-        } catch (IOException e) {
-            System.err.println("Ошибка: " + e.getMessage());
-        }
-    }
-    public static void parallelCopy(String sourcePath, String destinationPath) {
-        Thread copyThread = new Thread(() -> {
-            try (FileReader reader = new FileReader(sourcePath);
-                 FileWriter writer = new FileWriter(destinationPath)) {
-                int character;
-                while ((character = reader.read()) != -1) {
-                    writer.write(character);
-                }
-                System.out.println("Успешно завершено!");
-            } catch (IOException e) {
-                System.err.println("Ошибка: " + e.getMessage());
-            }
-        });
-        copyThread.start();
+        int fileSize = (int) new File(sourceFilePath).length();
+        int mid = fileSize / 2;
+
+        Thread thread1 = new Thread(new ParallelCopy(0, mid));
+        Thread thread2 = new Thread(new ParallelCopy(mid, fileSize));
+        thread1.start();
+        thread2.start();
+
         try {
-            copyThread.join();
+            thread1.join();
+            thread2.join();
         } catch (InterruptedException e) {
-            System.err.println("Ошибка: " + e.getMessage());
+            e.printStackTrace();
         }
+
+        endTime = System.currentTimeMillis();
+        System.out.println("Время, затраченное на параллельное копирование: " + (endTime - startTime) + " ms");
     }
 }
